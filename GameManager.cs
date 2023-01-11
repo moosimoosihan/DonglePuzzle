@@ -1,46 +1,166 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
-    public Dongle lastDongle;
+    [Header("-------------[ Ad ]")]
+    public AdManager admManager;
+    public int adCount;
+    public string adUnitId = "Interstitial_Android";
+
+    [Header("-------------[ Core ]")]
+    public bool isOver;
+    public int score;
+    public int maxLevel;
+    
+
+    [Header("-------------[ Object Pooling ]")]
     public GameObject donglePrefeb;
+    public GameObject itemPrefeb;
     public Transform dongleGroup;
+    public Transform itemGroup;
+    public List<Dongle> donglePool;
+    public List<Item> itemPool;
     public GameObject effectPrefeb;
     public Transform effectGroup;
+    public List<ParticleSystem> effectPool;
+    [Range(1, 30)]
+    public int poolSize;
+    [Range(1, 30)]
+    public int itemPoolSize;
+    public int poolCursor;
+    public int itemPoolCursor;
+    public Dongle lastDongle;
+    public Item lastItem;
+    public int count;
 
+    [Header("-------------[ Audio ]")]
     public AudioSource bgmPlayer;
     public AudioSource[] sfxPlayer;
     public AudioClip[] sfxClip;
     public enum Sfx { LevelUp, Next, Attach, Button, Over };
     int sfxCursor;
 
-    public int score;
-    public int maxLevel;
-    public bool isOver;
+    [Header("-------------[ UI ]")]
+    public GameObject startGroup;
+    public GameObject endGroup;
+    public GameObject helpGroup;
+    public GameObject helpGroup2;
+    public Text scoreText;
+    public Text maxScoreText;
+    public Text subScoreText;
+    public Text foodExText;
+    public Text timeText;
+    public float _sec;
+    public float _min;
 
-    void Awake()
-    {
-        Application.targetFrameRate = 60;
-    }
+    [Header("-------------[ ETC ]")]
+    public GameObject line;
+    public GameObject bottom;
+    public SpriteRenderer backSprite;
+    public float bottomTime;
+    public int bottomMaxCount;
 
     void Start()
     {
-        bgmPlayer.Play();
-        NextDongle();
+        if(!PlayerPrefs.HasKey("AdCount")){
+            PlayerPrefs.SetInt("AdCount", adCount);
+        } else {
+            adCount = 1 + PlayerPrefs.GetInt("AdCount");
+            PlayerPrefs.SetInt("AdCount", adCount);
+        }
     }
-    Dongle GetDongle()
+    void Awake()
+    {
+        Application.targetFrameRate = 60;
+
+        donglePool = new List<Dongle>();
+        effectPool = new List<ParticleSystem>();
+        itemPool = new List<Item>();
+        for(int index = 0; index<poolSize; index++){
+            MakeDongle();
+        }
+        for(int index = 0; index<itemPoolSize; index++){
+            MakeItem();
+        }
+
+        if(!PlayerPrefs.HasKey("MaxScore")){
+            PlayerPrefs.SetInt("MaxScore", 0);
+        }
+
+        maxScoreText.text = PlayerPrefs.GetInt("MaxScore").ToString();
+    }
+
+    public void GameStart()
+    {
+        line.SetActive(true);
+        bottom.SetActive(true);
+        scoreText.gameObject.SetActive(true);
+        maxScoreText.gameObject.SetActive(true);
+        timeText.gameObject.SetActive(true);
+        startGroup.SetActive(false);
+
+        bgmPlayer.Play();
+        SfxPlay(Sfx.Button);
+
+        Invoke("NextDongle", 1.5f);
+    }
+    Item MakeItem()
     {
         // 이펙트 생성
         GameObject instantEffectObj = Instantiate(effectPrefeb, effectGroup);
+        instantEffectObj.name = "Effect" + effectPool.Count;
         ParticleSystem instantEffect = instantEffectObj.GetComponent<ParticleSystem>();
+        effectPool.Add(instantEffect);
+
+        // 아이템 생성
+        GameObject instantItemObj = Instantiate(itemPrefeb, itemGroup);
+        instantItemObj.name = "Item" + itemPool.Count;
+        Item instantItem = instantItemObj.GetComponent<Item>();
+        instantItem.manager = this;
+        instantItem.effect = instantEffect;
+        itemPool.Add(instantItem);
+        return instantItem;
+    }
+    Dongle MakeDongle()
+    {
+        // 이펙트 생성
+        GameObject instantEffectObj = Instantiate(effectPrefeb, effectGroup);
+        instantEffectObj.name = "Effect" + effectPool.Count;
+        ParticleSystem instantEffect = instantEffectObj.GetComponent<ParticleSystem>();
+        effectPool.Add(instantEffect);
 
         // 동글 생성
         GameObject instantDongleObj = Instantiate(donglePrefeb, dongleGroup);
+        instantDongleObj.name = "Dongle" + donglePool.Count;
         Dongle instantDongle = instantDongleObj.GetComponent<Dongle>();
+        instantDongle.manager = this;
         instantDongle.effect = instantEffect;
+        donglePool.Add(instantDongle);
         return instantDongle;
+    }
+    Dongle GetDongle()
+    {
+        for(int index=0; index<donglePool.Count; index++){
+            poolCursor = (poolCursor + 1) % donglePool.Count;
+            if(!donglePool[poolCursor].gameObject.activeSelf){
+                return donglePool[poolCursor];
+            }
+        }
+        return MakeDongle();
+    }
+    Item GetItem()
+    {
+        for(int index=0; index<itemPool.Count; index++){
+            itemPoolCursor = (itemPoolCursor + 1) % itemPool.Count;
+            if(!itemPool[itemPoolCursor].gameObject.activeSelf){
+                return itemPool[itemPoolCursor];
+            }
+        }
+        return MakeItem();
     }
     void NextDongle()
     {
@@ -48,39 +168,88 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        Dongle newDongle = GetDongle();
-        lastDongle = newDongle;
-        lastDongle.manager = this;
+        count++;
+        lastDongle = GetDongle();
         lastDongle.level = Random.Range(0, maxLevel);
         lastDongle.gameObject.SetActive(true);
 
         SfxPlay(Sfx.Next);
         StartCoroutine(WaitNext());
     }
+    void NextItem()
+    {
+        if(isOver){
+            return;
+        }
+
+        lastItem = GetItem();
+        lastItem.gameObject.SetActive(true);
+        int ran = Random.Range(0, 4);
+        if(ran == 0){
+            lastItem.type = "Mag";
+            lastItem.spriteRenderer.color = new Color(0.1f, 0.2f, 0.8f);
+        } else if(ran == 1){
+            lastItem.type = "LevelUp";
+            lastItem.spriteRenderer.color = new Color(1, 0.6f, 0);
+        } else if(ran == 2){
+            lastItem.type = "LevelDown";
+            lastItem.spriteRenderer.color = new Color(1,0, 0);
+        } else if(ran == 3){
+            lastItem.type = "Anchor";
+            lastItem.spriteRenderer.color = Color.black;
+            lastItem.rigid.mass = 1000;
+        }
+        lastItem.spriteRenderer.sprite = lastItem.sprites[ran];
+
+        SfxPlay(Sfx.Next);
+        StartCoroutine(WaitNext());
+    }
     IEnumerator WaitNext()
     {
-        while(lastDongle != null){
+        while(lastDongle != null || lastItem != null){
             yield return null;
         }
 
         yield return new WaitForSeconds(2.5f);
 
-        NextDongle();
+        if(count % 10 == 0){
+            NextItem();
+            count = 0;
+        } else {
+            NextDongle();
+        }
+        
     }
     public void TouchDown()
     {
-        if(lastDongle == null)
+        if(count != 0){
+            if(lastDongle == null)
             return;
         
-        lastDongle.Drag();
+            lastDongle.Drag();
+        } else {
+            if(lastItem == null)
+            return;
+        
+            lastItem.Drag();
+        }
+        
     }
     public void TouchUp()
     {
-        if(lastDongle == null)
-            return;
+        if(count != 0){
+            if(lastDongle == null)
+                return;
 
-        lastDongle.Drop();
-        lastDongle = null;
+            lastDongle.Drop();
+            lastDongle = null;
+        } else {
+            if(lastItem == null)
+                return;
+
+            lastItem.Drop();
+            lastItem = null;
+        }
     }
     public void GameOver()
     {
@@ -109,9 +278,40 @@ public class GameManager : MonoBehaviour
 
         yield return new WaitForSeconds(1f);
 
+        int maxScore = Mathf.Max(score, PlayerPrefs.GetInt("MaxScore"));
+        PlayerPrefs.SetInt("MaxScore", maxScore);
+
+        subScoreText.text = "Score : " + scoreText.text;
+        endGroup.SetActive(true);
+
+        bgmPlayer.Stop();
         SfxPlay(Sfx.Over);
     }
 
+    public void Reset()
+    {
+        if(adCount >= 3){
+            // 전면광고 보이기
+            admManager.ShowAd();
+            PlayerPrefs.SetInt("AdCount", 0);
+            SfxPlay(Sfx.Button);
+        } else {
+            Restart(false);
+        }
+    }
+    public void Restart(bool ad)
+    {
+        if(ad){
+            SceneManager.LoadScene(0);
+        } else {
+            StartCoroutine(ResetCoroutine());
+        }
+    }
+    IEnumerator ResetCoroutine()
+    {
+        yield return new WaitForSeconds(1f);
+        SceneManager.LoadScene(0);
+    }
     public void SfxPlay(Sfx type)
     {
         switch(type){
@@ -134,5 +334,95 @@ public class GameManager : MonoBehaviour
         sfxPlayer[sfxCursor].Play();
         // 0 1 2 반복
         sfxCursor = (sfxCursor + 1) % sfxPlayer.Length;
+    }
+    void Update()
+    {
+        if(Input.GetButtonDown("Cancel")){
+            Application.Quit();
+        }
+        if(isOver){
+            return;
+        }
+        _sec += Time.deltaTime;
+        timeText.text = string.Format("{0:D2}:{1:D2}", (int)_min, (int)_sec);
+        if((int)_sec>59){
+            _sec = 0;
+            _min++;
+        }
+        BottomUp();
+    }
+    void BottomUp()
+    {
+        if(bottomMaxCount == 8)
+            return;
+        
+        bottomTime += Time.deltaTime;
+        // 5분마다 바닥이 올라온다. 최고 y축 8 만큼 올라올 수 있음! 1.5 씩 8번!
+        if(bottomTime >= 300){
+            bottomTime = 0;
+            bottomMaxCount++;
+            StartCoroutine(BottomUpRoutine());
+        }
+    }
+    IEnumerator BottomUpRoutine()
+    {
+        int bottomFrameCount = 0;
+        Vector3 nextPos = new Vector3(bottom.transform.position.x, bottom.transform.position.y + 1.5f, 0);
+
+        while(bottomFrameCount < 21){
+            bottomFrameCount++;
+            bottom.transform.position = Vector3.Lerp(bottom.transform.position, nextPos, 0.05f);
+
+            yield return null;
+        }
+    }
+    void LateUpdate()
+    {
+        scoreText.text = score.ToString();
+    }
+    public void HelpButton()
+    {
+        helpGroup.SetActive(true);
+    }
+    public void CloseButton()
+    {
+        if(helpGroup2.activeSelf){
+            helpGroup2.SetActive(false);
+        } else {
+            helpGroup.SetActive(false);
+        }
+    }
+    public void HelpNext()
+    {
+        helpGroup2.SetActive(true);
+    }
+    public void FoodTouch(int num)
+    {
+        switch(num){
+            case 0 :
+                foodExText.text = "Level 1: Sushi";
+            break;
+            case 1 :
+                foodExText.text = "Level 2: Muffins";
+            break;
+            case 2 :
+                foodExText.text = "Level 3: Rice Ball";
+            break;
+            case 3 :
+                foodExText.text = "Level 4: Gimbap";
+            break;
+            case 4 :
+                foodExText.text = "Level 5: Donut";
+            break;
+            case 5 :
+                foodExText.text = "Level 6: steak";
+            break;
+            case 6 :
+                foodExText.text = "Level 7: Hamburger";
+            break;
+            case 7 :
+                foodExText.text = "Level 8: Snack\nAutomatically Burst.";
+            break;
+        }
     }
 }

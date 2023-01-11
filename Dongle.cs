@@ -10,6 +10,7 @@ public class Dongle : MonoBehaviour
     public bool isDrag;
     public bool isMerge;
     public bool isAttach;
+    public bool isMaxLevel;
 
     public Rigidbody2D rigid;
     Animator anim;
@@ -31,6 +32,23 @@ public class Dongle : MonoBehaviour
         anim.SetInteger("Level", level);
     }
 
+    void OnDisable()
+    {
+        level = 0;
+        isDrag = false;
+        isMerge = false;
+        isAttach = false;
+        isMaxLevel = false;
+
+        transform.localPosition = Vector3.zero;
+        transform.localRotation = Quaternion.identity;
+        transform.localScale = Vector3.zero;
+
+        rigid.simulated = false;
+        rigid.velocity = Vector2.zero;
+        rigid.angularVelocity = 0;
+        circle.enabled = true;
+    }
     void Update()
     {
         if(isDrag){
@@ -49,6 +67,13 @@ public class Dongle : MonoBehaviour
             mousePos.z = 0;
             transform.position = Vector3.Lerp(transform.position, mousePos, 0.2f);
         }
+        if(level == 7){
+            if(!isMaxLevel){
+                isMaxLevel = true;
+                Invoke("EffectPlay", 0.8f);
+                Invoke("ActiveOff", 1f);
+            }
+        }
     }
 
     public void Drag()
@@ -62,6 +87,25 @@ public class Dongle : MonoBehaviour
     }
     void OnCollisionEnter2D(Collision2D collision) {
         StartCoroutine(AttachRoutine());
+        if(collision.gameObject.tag == "Dongle"){
+            Dongle other = collision.gameObject.GetComponent<Dongle>();
+
+            if(level == other.level && !isMerge && !other.isMerge && level < 7){
+                // 나와 상대편 위치 가져오기
+                float meX = transform.position.x;
+                float meY = transform.position.y;
+                float otherX = other.transform.position.x;
+                float otherY = other.transform.position.y;
+                // 1. 내가 아래에 있을 경우
+                // 2. 동일한 높이일 경우, 내가 오른쪽에 있을 경우
+                if(meY < otherY || (meY == otherY && meX > otherX)){
+                    // 상대방은 숨기기
+                    other.Hide(transform.position);
+                    // 나는 레벨 업
+                    LevelUp();
+                }
+            }
+        }
     }
     IEnumerator AttachRoutine()
     {
@@ -72,7 +116,7 @@ public class Dongle : MonoBehaviour
         isAttach = true;
         manager.SfxPlay(GameManager.Sfx.Attach);
 
-        yield return new WaitForSeconds(0.2f);
+        yield return new WaitForSeconds(0.5f);
 
         isAttach = false;
 
@@ -125,12 +169,9 @@ public class Dongle : MonoBehaviour
 
             yield return null;
         }
-        manager.score += (int)Mathf.Pow(2, level);
-
-        isMerge = false;
-        gameObject.SetActive(false);
+        ActiveOff();
     }
-    void LevelUp()
+    public void LevelUp()
     {
         isMerge = true;
 
@@ -139,18 +180,38 @@ public class Dongle : MonoBehaviour
 
         StartCoroutine(LevelUpRoutine());
     }
+    public void LevelDown()
+    {
+        isMerge = true;
+
+        rigid.velocity = Vector2.zero;
+        rigid.angularVelocity = 0;
+
+        StartCoroutine(LevelDownRoutine());
+    }
     IEnumerator LevelUpRoutine()
     {
         yield return new WaitForSeconds(0.2f);
 
         anim.SetInteger("Level", level + 1);
         EffectPlay();
-        manager.SfxPlay(GameManager.Sfx.LevelUp);
 
         yield return new WaitForSeconds(0.3f);
         level++;
 
         manager.maxLevel = Mathf.Max(level, manager.maxLevel);
+
+        isMerge = false;
+    }
+    IEnumerator LevelDownRoutine()
+    {
+        yield return new WaitForSeconds(0.2f);
+
+        anim.SetInteger("Level", level - 1);
+        EffectPlay();
+
+        yield return new WaitForSeconds(0.3f);
+        level--;
 
         isMerge = false;
     }
@@ -177,8 +238,27 @@ public class Dongle : MonoBehaviour
 
     void EffectPlay()
     {
+        manager.SfxPlay(GameManager.Sfx.LevelUp);
         effect.transform.position = transform.position;
         effect.transform.localScale = transform.localScale;
         effect.Play();
+        manager.backSprite.color = new Color(0.9f,0.8f,0.9f);
+        StartCoroutine(EffectPointerRoutine(effect.gameObject));
+    }
+    IEnumerator EffectPointerRoutine(GameObject effect)
+    {
+        yield return null;
+        PointEffector2D effectPoint = effect.GetComponent<PointEffector2D>();
+        effectPoint.enabled = true;
+        yield return new WaitForSeconds(0.1f);
+        effectPoint.enabled = false;
+        manager.backSprite.color = new Color(0.9f,0.8f,1);
+    }
+    void ActiveOff()
+    {
+        manager.score += (int)Mathf.Pow(2, level);
+
+        isMerge = false;
+        gameObject.SetActive(false);
     }
 }
