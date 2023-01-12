@@ -7,7 +7,7 @@ public class AdManager : MonoBehaviour, IUnityAdsLoadListener, IUnityAdsShowList
 {
     public GameManager gameManager;
     private string _gameId = "5115689";
-    public string _adUnitId = "Interstitial_Android";
+    public string _adUnitId = "Rewarded_Android";
 
     void Start()
     {

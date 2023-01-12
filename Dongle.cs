@@ -67,11 +67,17 @@ public class Dongle : MonoBehaviour
             mousePos.z = 0;
             transform.position = Vector3.Lerp(transform.position, mousePos, 0.2f);
         }
-        if(level == 7){
+        if(level == manager.dongleMaxLevel){
             if(!isMaxLevel){
                 isMaxLevel = true;
+                if(level + 1 > manager.foodLevel){
+                    manager.foodLevel = level + 1;
+                    PlayerPrefs.SetInt("FoodLevel", manager.foodLevel);
+                    PlayerPrefs.Save();
+                }
                 Invoke("EffectPlay", 0.8f);
                 Invoke("ActiveOff", 1f);
+                
             }
         }
     }
@@ -90,7 +96,7 @@ public class Dongle : MonoBehaviour
         if(collision.gameObject.tag == "Dongle"){
             Dongle other = collision.gameObject.GetComponent<Dongle>();
 
-            if(level == other.level && !isMerge && !other.isMerge && level < 7){
+            if(level == other.level && !isMerge && !other.isMerge && level < manager.dongleMaxLevel){
                 // 나와 상대편 위치 가져오기
                 float meX = transform.position.x;
                 float meY = transform.position.y;
@@ -125,7 +131,7 @@ public class Dongle : MonoBehaviour
         if(collision.gameObject.tag == "Dongle"){
             Dongle other = collision.gameObject.GetComponent<Dongle>();
 
-            if(level == other.level && !isMerge && !other.isMerge && level < 7){
+            if(level == other.level && !isMerge && !other.isMerge && level < manager.dongleMaxLevel){
                 // 나와 상대편 위치 가져오기
                 float meX = transform.position.x;
                 float meY = transform.position.y;
@@ -200,6 +206,11 @@ public class Dongle : MonoBehaviour
         level++;
 
         manager.maxLevel = Mathf.Max(level, manager.maxLevel);
+        if(manager.maxLevel > manager.foodLevel){
+            manager.foodLevel = manager.maxLevel;
+            PlayerPrefs.SetInt("FoodLevel", manager.foodLevel);
+            PlayerPrefs.Save();
+        }
 
         isMerge = false;
     }

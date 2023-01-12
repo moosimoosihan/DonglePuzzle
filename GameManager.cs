@@ -9,12 +9,14 @@ public class GameManager : MonoBehaviour
     [Header("-------------[ Ad ]")]
     public AdManager admManager;
     public int adCount;
-    public string adUnitId = "Interstitial_Android";
 
     [Header("-------------[ Core ]")]
     public bool isOver;
+    public bool isStart;
     public int score;
     public int maxLevel;
+    public int dongleMaxLevel;
+    public int MaxiumLevel;
     
 
     [Header("-------------[ Object Pooling ]")]
@@ -56,6 +58,8 @@ public class GameManager : MonoBehaviour
     public Text timeText;
     public float _sec;
     public float _min;
+    public int foodLevel;
+    public Image[] foodImage;
 
     [Header("-------------[ ETC ]")]
     public GameObject line;
@@ -71,6 +75,12 @@ public class GameManager : MonoBehaviour
         } else {
             adCount = 1 + PlayerPrefs.GetInt("AdCount");
             PlayerPrefs.SetInt("AdCount", adCount);
+        }
+        if(!PlayerPrefs.HasKey("FoodLevel")){
+            PlayerPrefs.SetInt("FoodLevel", 2);
+            foodLevel = 2;
+        } else {
+            foodLevel = PlayerPrefs.GetInt("FoodLevel");
         }
     }
     void Awake()
@@ -96,6 +106,7 @@ public class GameManager : MonoBehaviour
 
     public void GameStart()
     {
+        isStart = true;
         line.SetActive(true);
         bottom.SetActive(true);
         scoreText.gameObject.SetActive(true);
@@ -258,6 +269,7 @@ public class GameManager : MonoBehaviour
         }
 
         isOver = true;
+        isStart = false;
         StartCoroutine(GameOverRoutine());
     }
     IEnumerator GameOverRoutine()
@@ -340,7 +352,7 @@ public class GameManager : MonoBehaviour
         if(Input.GetButtonDown("Cancel")){
             Application.Quit();
         }
-        if(isOver){
+        if(!isStart){
             return;
         }
         _sec += Time.deltaTime;
@@ -362,14 +374,19 @@ public class GameManager : MonoBehaviour
             bottomTime = 0;
             bottomMaxCount++;
             StartCoroutine(BottomUpRoutine());
+            // 레벨 증가
+            
+            if(dongleMaxLevel < MaxiumLevel){
+                dongleMaxLevel++;
+            }
         }
     }
     IEnumerator BottomUpRoutine()
     {
         int bottomFrameCount = 0;
-        Vector3 nextPos = new Vector3(bottom.transform.position.x, bottom.transform.position.y + 1.5f, 0);
+        Vector3 nextPos = new Vector3(bottom.transform.position.x, bottom.transform.position.y + 1, 0);
 
-        while(bottomFrameCount < 21){
+        while(bottomFrameCount < 20){
             bottomFrameCount++;
             bottom.transform.position = Vector3.Lerp(bottom.transform.position, nextPos, 0.05f);
 
@@ -382,6 +399,7 @@ public class GameManager : MonoBehaviour
     }
     public void HelpButton()
     {
+        SfxPlay(Sfx.Button);
         helpGroup.SetActive(true);
     }
     public void CloseButton()
@@ -394,7 +412,11 @@ public class GameManager : MonoBehaviour
     }
     public void HelpNext()
     {
+        SfxPlay(Sfx.Button);
         helpGroup2.SetActive(true);
+        for(int i = 0; i<foodLevel;i++){
+            foodImage[i].color = Color.white;
+        }
     }
     public void FoodTouch(int num)
     {
@@ -415,13 +437,22 @@ public class GameManager : MonoBehaviour
                 foodExText.text = "Level 5: Donut";
             break;
             case 5 :
-                foodExText.text = "Level 6: steak";
+                foodExText.text = "Level 6: Steak";
             break;
             case 6 :
                 foodExText.text = "Level 7: Hamburger";
             break;
             case 7 :
-                foodExText.text = "Level 8: Snack\nAutomatically Burst.";
+                foodExText.text = "Level 8: Snack";
+            break;
+            case 8 :
+                foodExText.text = "Level 9: Water Melon";
+            break;
+            case 9 :
+                foodExText.text = "Level 10: Tomato";
+            break;
+            case 10 :
+                foodExText.text = "Level 11: Pine Apple";
             break;
         }
     }

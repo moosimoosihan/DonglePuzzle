@@ -78,7 +78,7 @@ public class Item : MonoBehaviour
                     StartCoroutine(StartMagRoutine());
                     break;
                 case "LevelUp":
-                    if(dongleLogic.level != 7){
+                    if(dongleLogic.level != manager.dongleMaxLevel){
                         Hide(collision.transform.position);
                         dongleLogic.LevelUp();
                     }
@@ -104,7 +104,7 @@ public class Item : MonoBehaviour
                     StartCoroutine(StartMagRoutine());
                     break;
                 case "LevelUp":
-                    if(dongleLogic.level != 7){
+                    if(dongleLogic.level != manager.dongleMaxLevel){
                         Hide(collision.transform.position);
                         dongleLogic.LevelUp();
                     }
